@@ -5,58 +5,6 @@ class StartGame extends BaseManager {
         super(db);
     }
     
-    async getRoomById(roomId) {
-        return await this.db.query(
-            "SELECT id, status, name, room_size FROM rooms WHERE id=?", 
-            [roomId]
-        );
-    }
-    
-    async getAllRoomMembers(roomId) {
-        return await this.db.queryAll(
-            "SELECT * FROM room_members WHERE room_id=?", 
-            [roomId]
-        );
-    }
-    
-    async updateRoomStatus(roomId, status) {
-        await this.db.execute(
-            "UPDATE rooms SET status=? WHERE id=?", 
-            [status, roomId]
-        );
-    }
-    
-    async updateAllRoomMembersStatus(roomId, status) {
-        await this.db.execute(
-            "UPDATE room_members SET status=? WHERE room_id=?", 
-            [status, roomId]
-        );
-    }
-    
-    async createInitialBotsForRoom(roomId) {
-        await this.db.execute(
-            "INSERT INTO bots_rooms (room_id) VALUES (?)",
-            [roomId]
-        );
-    }
-    
-    async createInitialArrowsForRoom(roomId) {
-        await this.db.execute(
-            "INSERT INTO arrows (room_id) VALUES (?)",
-            [roomId]
-        );
-    }
-    
-    async getRoomMemberByUserId(userId) {
-        const character = await this.db.getCharacterByUserId(userId);
-        if (!character) return null;
-        
-        return await this.db.query(
-            "SELECT id, room_id as roomId, character_id as characterId, type, status, data FROM room_members WHERE character_id=?", 
-            [character.id]
-        );
-    }
-    
     async execute(params) {
         if (!params.token) {
             return { error: 242 };
@@ -82,7 +30,7 @@ class StartGame extends BaseManager {
             return roomMember;
         }
         
-        const room = await this.getRoomById(roomMember.roomId);
+        const room = await this.db.getRoomById(roomMember.roomId);
         if (!room) {
             return { error: 2003 };
         }
@@ -91,7 +39,7 @@ class StartGame extends BaseManager {
             return { error: 2015 };
         }
         
-        const roomMembers = await this.getAllRoomMembers(roomMember.roomId);
+        const roomMembers = await this.db.getAllRoomMembers(roomMember.roomId);
         
         let readyPlayers = 0;
         for (const member of roomMembers) {
@@ -104,23 +52,15 @@ class StartGame extends BaseManager {
             return { error: 2012 };
         }
         
-        await this.updateRoomStatus(roomMember.roomId, 'started');
-        await this.updateAllRoomMembersStatus(roomMember.roomId, 'started');
+        await this.db.updateRoomStatus(roomMember.roomId, 'started');
+        await this.db.updateAllRoomMembersStatus(roomMember.roomId, 'started');
         
-        await this.createInitialBotsForRoom(roomMember.roomId);
-        await this.createInitialArrowsForRoom(roomMember.roomId);
+        await this.db.createInitialBotsForRoom(roomMember.roomId);
+        await this.db.createInitialArrowsForRoom(roomMember.roomId);
         
-        await this.db.execute(
-            "UPDATE hashes SET room_hash = ? WHERE id = 1",
-            [this.md5(Math.random().toString())]
-        );
+        await this.db.updateRoomHash(this.md5(Math.random().toString()));
         
         return true;
-    }
-    
-    md5(input) {
-        const crypto = require('crypto');
-        return crypto.createHash('md5').update(input).digest('hex');
     }
 }
 

@@ -136,6 +136,105 @@ class DB {
         return result.affectedRows > 0;
     }
 
+    async isUserPlaying(userId) {
+        const character = await this.getCharacterByUserId(userId);
+        if (!character) return false;
+        
+        const result = await this.query(
+            "SELECT id FROM room_members WHERE character_id = ? AND status = 'started'", 
+            [character.id]
+        );
+        return result !== null;
+    }
+
+    async getUserTypeInRoom(userId) {
+        const character = await this.getCharacterByUserId(userId);
+        if (!character) return null;
+        
+        const result = await this.query(
+            "SELECT type, room_id as roomId FROM room_members WHERE character_id=?", 
+            [character.id]
+        );
+        return result ? { type: result.type, roomId: result.roomId } : null;
+    }
+
+    async leaveParticipantFromRoom(userId) {
+        const character = await this.getCharacterByUserId(userId);
+        if (!character) return false;
+        
+        await this.execute(
+            "DELETE FROM room_members WHERE character_id=?", 
+            [character.id]
+        );
+        return true;
+    }
+
+    async createRoom(userId, roomName, roomSize) {
+        const character = await this.getCharacterByUserId(userId);
+        if (!character) return false;
+        
+        const result = await this.execute(
+            "INSERT INTO rooms (name, room_size) VALUES (?, ?)", 
+            [roomName, roomSize]
+        );
+        const roomId = result.insertId;
+        
+        await this.execute(
+            "INSERT INTO room_members (room_id, character_id, type, status) VALUES (?, ?, ?, ?)",
+            [roomId, character.id, 'owner', 'ready']
+        );
+        return roomId;
+    }
+
+    async addRoomMember(roomId, characterId, type, status = 'ready') {
+        await this.execute(
+            "INSERT INTO room_members (room_id, character_id, type, status) VALUES (?, ?, ?, ?)",
+            [roomId, characterId, type, status]
+        );
+    }
+
+    async updateRoomStatus(roomId, status) {
+        await this.execute(
+            "UPDATE rooms SET status=? WHERE id=?", 
+            [status, roomId]
+        );
+    }
+
+    async updateAllRoomMembersStatus(roomId, status) {
+        await this.execute(
+            "UPDATE room_members SET status=? WHERE room_id=?", 
+            [status, roomId]
+        );
+    }
+
+    async createInitialBotsForRoom(roomId) {
+        await this.execute(
+            "INSERT INTO bots_rooms (room_id) VALUES (?)",
+            [roomId]
+        );
+    }
+
+    async createInitialArrowsForRoom(roomId) {
+        await this.execute(
+            "INSERT INTO arrows (room_id) VALUES (?)",
+            [roomId]
+        );
+    }
+
+    async updateRoomHash(hash) {
+        await this.execute(
+            "UPDATE hashes SET room_hash = ? WHERE id = 1",
+            [hash]
+        );
+    }
+
+    async getAllRoomMembers(roomId) {
+        return await this.queryAll(
+            "SELECT * FROM room_members WHERE room_id=?", 
+            [roomId]
+        );
+    }
+
     // ============ MESSAGE METHODS ============
     async deleteUserMessages(userId) {
         const result = await this.execute("DELETE FROM messages WHERE user_id = ?", [userId]);

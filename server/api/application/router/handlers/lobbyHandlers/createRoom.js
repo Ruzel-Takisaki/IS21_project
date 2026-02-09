@@ -6,58 +6,7 @@ class CreateRoom extends BaseManager {
         super(db);
     }
     
-    async isUserPlaying(userId) {
-        const character = await this.db.getCharacterByUserId(userId);
-        if (!character) return false;
-        
-        const result = await this.db.query(
-            "SELECT id FROM room_members WHERE character_id = ? AND status = 'started'", 
-            [character.id]
-        );
-        return result !== null;
-    }
-    
-    async getUserTypeInRoom(userId) {
-        const character = await this.db.getCharacterByUserId(userId);
-        if (!character) return false;
-        
-        const result = await this.db.query(
-            "SELECT type, room_id as roomId FROM room_members WHERE character_id=?", 
-            [character.id]
-        );
-        return result ? result.type : false;
-    }
-    
-    async leaveParticipantFromRoom(userId) {
-        const character = await this.db.getCharacterByUserId(userId);
-        if (!character) return false;
-        
-        await this.db.execute(
-            "DELETE FROM room_members WHERE character_id=?", 
-            [character.id]
-        );
-        return true;
-    }
-    
-    async createRoom(userId, roomName, roomSize) {
-        const character = await this.db.getCharacterByUserId(userId);
-        if (!character) return false;
-        
-        const result = await this.db.execute(
-            "INSERT INTO rooms (name, room_size) VALUES (?, ?)", 
-            [roomName, roomSize]
-        );
-        const roomId = result.insertId;
-        
-        await this.db.execute(
-            "INSERT INTO room_members (room_id, character_id, type, status) VALUES (?, ?, ?, ?)",
-            [roomId, character.id, 'owner', 'ready']
-        );
-        return roomId;
-    }
-    
     async execute(params) {
-
         if (!params.token || !params.roomName || !params.roomSize) {
             return { error: 242 };
         }
@@ -77,7 +26,8 @@ class CreateRoom extends BaseManager {
             return character;
         }
         
-        if (await this.isUserPlaying(user.id)) {
+        const isPlaying = await this.db.isUserPlaying(user.id);
+        if (isPlaying) {
             return { error: 2001 };
         }
         
@@ -87,36 +37,25 @@ class CreateRoom extends BaseManager {
             return { error: 2013 };
         }
         
-        const userType = await this.getUserTypeInRoom(user.id);
+        const userTypeInRoom = await this.db.getUserTypeInRoom(user.id);
         
-        if (userType === 'owner') {
+        if (userTypeInRoom && userTypeInRoom.type === 'owner') {
             return { error: 2002 };
         }
         
-        if (userType === 'participant') {
-            await this.leaveParticipantFromRoom(user.id);
+        if (userTypeInRoom && userTypeInRoom.type === 'participant') {
+            await this.db.leaveParticipantFromRoom(user.id);
         }
         
-        const roomId = await this.createRoom(user.id, params.roomName, roomSize);
+        const roomId = await this.db.createRoom(user.id, params.roomName, roomSize);
         
         if (roomSize === 1) {
-            await this.db.execute(
-                "UPDATE rooms SET status=? WHERE id=?", 
-                ['closed', roomId]
-            );
+            await this.db.updateRoomStatus(roomId, 'closed');
         }
         
-        await this.db.execute(
-            "UPDATE hashes SET room_hash = ? WHERE id = 1",
-            [this.md5(Math.random().toString())]
-        );
+        await this.db.updateRoomHash(this.md5(Math.random().toString()));
         
         return true;
-    }
-    
-    md5(input) {
-        const crypto = require('crypto');
-        return crypto.createHash('md5').update(input).digest('hex');
     }
 }
 

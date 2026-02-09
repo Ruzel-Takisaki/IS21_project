@@ -5,29 +5,7 @@ class DropFromRoom extends BaseManager {
         super(db);
     }
     
-    async leaveParticipantFromRoom(userId) {
-        const character = await this.db.getCharacterByUserId(userId);
-        if (!character) return false;
-        
-        await this.db.execute(
-            "DELETE FROM room_members WHERE character_id=?", 
-            [character.id]
-        );
-        return true;
-    }
-    
-    async getRoomMemberByUserId(userId) {
-        const character = await this.db.getCharacterByUserId(userId);
-        if (!character) return null;
-        
-        return await this.db.query(
-            "SELECT id, room_id as roomId, character_id as characterId, type, status, data FROM room_members WHERE character_id=?", 
-            [character.id]
-        );
-    }
-    
     async execute(params) {
-        
         if (!params.token || !params.targetToken) {
             return { error: 242 };
         }
@@ -61,30 +39,19 @@ class DropFromRoom extends BaseManager {
             return { error: 2007 };
         }
         
-        const targetRoomMember = await this.getRoomMemberByUserId(targetUser.id);
+        const targetRoomMember = await this.db.getRoomMemberByUserId(targetUser.id);
         
         if (!targetRoomMember || targetRoomMember.roomId !== roomMember.roomId) {
             return { error: 2009 };
         }
         
-        await this.leaveParticipantFromRoom(targetUser.id);
+        await this.db.leaveParticipantFromRoom(targetUser.id);
         
-        await this.db.execute(
-            "UPDATE rooms SET status=? WHERE id=?", 
-            ['open', roomMember.roomId]
-        );
+        await this.db.updateRoomStatus(roomMember.roomId, 'open');
 
-        await this.db.execute(
-            "UPDATE hashes SET room_hash = ? WHERE id = 1",
-            [this.md5(Math.random().toString())]
-        );
+        await this.db.updateRoomHash(this.md5(Math.random().toString()));
         
         return true;
-    }
-    
-    md5(input) {
-        const crypto = require('crypto');
-        return crypto.createHash('md5').update(input).digest('hex');
     }
 }
 
