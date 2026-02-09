@@ -93,6 +93,49 @@ class DB {
         return await this.query("SELECT type, room_id as roomId FROM room_members WHERE character_id=?", [character.id]);
     }
 
+    // ============ LOBBY METHODS ============
+    async getRoomMemberByUserId(userId) {
+        const character = await this.getCharacterByUserId(userId);
+        if (!character) return null;
+        
+        return await this.query(
+            "SELECT id, room_id as roomId, character_id as characterId, type, status, data FROM room_members WHERE character_id=?", 
+            [character.id]
+        );
+    }
+
+    async deleteAllRoomMembers(roomId) {
+        const result = await this.execute(
+            "DELETE FROM room_members WHERE room_id=?", 
+            [roomId]
+        );
+        return result.affectedRows > 0;
+    }
+
+    async deleteRoom(roomId) {
+        const result = await this.execute(
+            "DELETE FROM rooms WHERE id=?", 
+            [roomId]
+        );
+        return result.affectedRows > 0;
+    }
+
+    async deleteAllBotsForRoom(roomId) {
+        const result = await this.execute(
+            "DELETE FROM bots_rooms WHERE room_id = ?", 
+            [roomId]
+        );
+        return result.affectedRows > 0;
+    }
+
+    async deleteAllArrowsForRoom(roomId) {
+        const result = await this.execute(
+            "DELETE FROM arrows WHERE room_id = ?", 
+            [roomId]
+        );
+        return result.affectedRows > 0;
+    }
+
     // ============ MESSAGE METHODS ============
     async deleteUserMessages(userId) {
         const result = await this.execute("DELETE FROM messages WHERE user_id = ?", [userId]);

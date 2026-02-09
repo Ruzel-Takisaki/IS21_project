@@ -31,6 +31,13 @@ app.all('/api', async (req, res) => {
                     case 'deleteUser': return app.deleteUser(params);
                     case 'getUserInfo': return app.getUserInfo(params);
                     case 'getRatingTable': return app.getRatingTable(params);
+                    // lobbyHandlers
+                    case 'createRoom': return app.createRoom(params);
+                    case 'joinToRoom': return app.joinToRoom(params);
+                    case 'leaveRoom': return app.leaveRoom(params);
+                    case 'dropFromRoom': return app.dropFromRoom(params);
+                    case 'startGame': return app.startGame(params);
+                    
                     default: return { error: 102 };
                 }
             }

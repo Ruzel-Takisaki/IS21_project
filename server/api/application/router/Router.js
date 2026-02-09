@@ -6,6 +6,11 @@ const Registration = require('./handlers/userHandlers/registration.js');
 const DeleteUser = require('./handlers/userHandlers/deleteUser.js');
 const GetUserInfo = require('./handlers/userHandlers/getUserInfo.js');
 const GetRatingTable = require('./handlers/userHandlers/getRatingTable.js');
+const CreateRoom = require('./handlers/lobbyHandlers/createRoom.js');
+const JoinToRoom = require('./handlers/lobbyHandlers/joinToRoom.js');
+const LeaveRoom = require('./handlers/lobbyHandlers/leaveRoom.js');
+const DropFromRoom = require('./handlers/lobbyHandlers/dropFromRoom.js');
+const StartGame = require('./handlers/lobbyHandlers/startGame.js');
 
 class Router extends BaseManager {
     constructor() {
@@ -71,6 +76,67 @@ class Router extends BaseManager {
             const user = await this.db.getUserByToken(params.token);
             if (user) {
                 const handler = new GetRatingTable(this.db);
+                return await handler.execute(params);
+            }
+            return { error: 705 };
+        }
+        return { error: 242 };
+    }
+    
+    // ============ LOBBY METHODS ============
+    async createRoom(params) {
+        if (params.token && params.roomName && params.roomSize) {
+            const user = await this.db.getUserByToken(params.token);
+            if (user) {
+                const handler = new CreateRoom(this.db);
+                return await handler.execute(params);
+            }
+            return { error: 705 };
+        }
+        return { error: 242 };
+    }
+    
+    async joinToRoom(params) {
+        if (params.token && params.roomId) {
+            const user = await this.db.getUserByToken(params.token);
+            if (user) {
+                const handler = new JoinToRoom(this.db);
+                return await handler.execute(params);
+            }
+            return { error: 705 };
+        }
+        return { error: 242 };
+    }
+    
+    async leaveRoom(params) {
+        if (params.token) {
+            const user = await this.db.getUserByToken(params.token);
+            if (user) {
+                const handler = new LeaveRoom(this.db);
+                return await handler.execute(params);
+            }
+            return { error: 705 };
+        }
+        return { error: 242 };
+    }
+    
+    async dropFromRoom(params) {
+        if (params.token && params.targetToken) {
+            const user = await this.db.getUserByToken(params.token);
+            if (user) {
+                const handler = new DropFromRoom(this.db);
+                return await handler.execute(params);
+            }
+            return { error: 705 };
+        }
+        return { error: 242 };
+    }
+    
+    async startGame(params) {
+        if (params.token) {
+            const user = await this.db.getUserByToken(params.token);
+            if (user) {
+                const handler = new StartGame(this.db);
                 return await handler.execute(params);
             }
             return { error: 705 };
