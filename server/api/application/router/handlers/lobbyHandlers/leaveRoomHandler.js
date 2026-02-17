@@ -1,76 +1,88 @@
-const BaseManager = require('../../BaseManager.js');
+const BaseHandler = require('../BaseHandler.js');
 
-class LeaveRoom extends BaseManager {
+class LeaveRoomHandler extends BaseHandler {
     constructor(db) {
         super(db);
     }
     
     async execute(params) {
-        // Проверка наличия токена
-        if (!params.token) {
-            return { error: 242 };
-        }
-        
-        // Получение пользователя по токену
-        const user = await this.db.getUserByToken(params.token);
-        if (!user) {
-            return { error: 705 };
-        }
-        
-        // Проверка существования пользователя
-        const userCheck = await this.checkUserExists(user.id);
-        if (userCheck.error) {
-            return userCheck;
-        }
-
-        // Проверка существования персонажа у пользователя
-        const character = await this.checkCharacterExists(user.id);
-        if (character.error) {
-            return character;
-        }
-        
-        // Получение информации о членстве пользователя в комнате
-        const roomMember = await this.db.getRoomMemberByUserId(user.id);
-        if (!roomMember) {
-            return { error: 2006 };
-        }
-        
-        // Получение информации о комнате
-        const room = await this.db.getRoomById(roomMember.roomId);
-        if (!room) {
-            return { error: 2003 };
-        }
-        
-        // Получение типа пользователя в комнате
-        const userTypeInRoom = await this.db.getUserTypeInRoom(user.id);
-        
-        // Проверка, является ли пользователь владельцем комнаты
-        if (userTypeInRoom.type === 'owner') {
-            // Если игра уже началась, удаляем ботов и стрелы
-            if (room.status === 'started') {
-                await this.db.deleteAllBotsForRoom(roomMember.roomId);
-                await this.db.deleteAllArrowsForRoom(roomMember.roomId);
+        try {
+            // Проверка наличия всех необходимых параметров
+            if (!params.token) {
+                return { error: 242 };
             }
             
-            // Удаление всех участников комнаты и самой комнаты
-            await this.db.deleteAllRoomMembers(roomMember.roomId);
-            await this.db.deleteRoom(roomMember.roomId);
+            // Получение пользователя по токену
+            const user = await this.checkUserByToken(params.token);
+            if (user.error) return user;
             
-        } else {
-            // Если пользователь участник, просто удаляем его из комнаты
-            await this.db.leaveParticipantFromRoom(user.id);
+            // Проверка существования персонажа у пользователя
+            const character = await this.checkCharacterExists(user.id);
+            if (character.error) return character;
             
-            // Если игра еще не началась, открываем комнату для новых участников
-            if (room.status !== 'started') {
-                await this.db.updateRoomStatus(roomMember.roomId, 'open');
+            // Проверка, находится ли пользователь в комнате
+            const roomMember = await this.db.getRoomMemberByUserId(user.id);
+            if (!roomMember) {
+                return { error: 2006 };
             }
+            
+            // Получение информации о комнате
+            const room = await this.db.getRoomById(roomMember.roomId);
+            if (!room) {
+                return { error: 2003 };
+            }
+            
+            // Начало транзакции
+            const connection = await this.db.beginTransaction();
+            try {
+                // Обработка выхода владельца комнаты
+                if (roomMember.type === 'owner') {
+                    // Если игра уже началась, удаление данных ботов и стрел
+                    if (room.status === 'started') {
+                        await this.db.deleteAllBotsForRoom(roomMember.roomId);
+                        await this.db.deleteAllArrowsForRoom(roomMember.roomId);
+                    }
+                    
+                    // Удаление всех участников комнаты
+                    await this.db.deleteAllRoomMembers(roomMember.roomId);
+                    // Удаление самой комнаты
+                    await this.db.deleteRoom(roomMember.roomId);
+                    
+                } else {
+                    // Обработка выхода обычного участника
+                    await this.leaveParticipantFromRoom(user.id);
+                    
+                    // Получение списка оставшихся участников
+                    const remainingMembers = await this.db.getAllRoomMembers(roomMember.roomId);
+                    
+                    // Если комната не в статусе started и в ней есть участники, открытие её для входа
+                    if (room.status !== 'started' && remainingMembers.length > 0) {
+                        await this.db.updateRoomStatus(roomMember.roomId, 'open');
+                    }
+                    
+                    // Если в комнате не осталось участников, удаление комнаты
+                    if (remainingMembers.length === 0) {
+                        await this.db.deleteRoom(roomMember.roomId);
+                    }
+                }
+                
+                // Обновление хеша комнаты для синхронизации с клиентами
+                await this.db.updateRoomHash(this.md5(Math.random().toString()));
+                
+                // Подтверждение транзакции
+                await this.db.commit(connection);
+                return true;
+                
+            } catch (e) {
+                // Откат транзакции в случае ошибки
+                await this.db.rollback(connection);
+                return { error: 2006 };
+            }
+            
+        } catch (error) {
+            return { error: 9000 };
         }
-        
-        // Обновление хеша комнаты для синхронизации клиентов
-        await this.db.updateRoomHash(this.md5(Math.random().toString()));
-        
-        return true;
     }
 }
 
-module.exports = LeaveRoom;
+module.exports = LeaveRoomHandler;

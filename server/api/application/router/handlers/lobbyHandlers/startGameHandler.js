@@ -1,82 +1,94 @@
-const BaseManager = require('../../BaseManager.js');
+const BaseHandler = require('../BaseHandler.js');
 
-class StartGame extends BaseManager {
+class StartGameHandler extends BaseHandler {
     constructor(db) {
         super(db);
     }
     
     async execute(params) {
-        // Проверка наличия токена
-        if (!params.token) {
-            return { error: 242 };
-        }
-        
-        // Получение пользователя по токену
-        const user = await this.db.getUserByToken(params.token);
-        if (!user) {
-            return { error: 705 };
-        }
-        
-        // Проверка существования пользователя
-        const userCheck = await this.checkUserExists(user.id);
-        if (userCheck.error) {
-            return userCheck;
-        }
-
-        // Проверка существования персонажа у пользователя
-        const character = await this.checkCharacterExists(user.id);
-        if (character.error) {
-            return character;
-        }
-        
-        // Проверка, является ли пользователь владельцем комнаты
-        const roomMember = await this.checkUserIsRoomOwner(user.id);
-        if (roomMember.error) {
-            return roomMember;
-        }
-        
-        // Получение информации о комнате
-        const room = await this.db.getRoomById(roomMember.roomId);
-        if (!room) {
-            return { error: 2003 };
-        }
-        
-        // Проверка, закрыта ли комната (все участники на месте)
-        if (room.status !== 'closed') {
-            return { error: 2015 };
-        }
-        
-        // Получение всех участников комнаты
-        const roomMembers = await this.db.getAllRoomMembers(roomMember.roomId);
-        
-        // Подсчет готовых игроков
-        let readyPlayers = 0;
-        for (const member of roomMembers) {
-            if (member.status === 'ready') {
-                readyPlayers++;
+        try {
+            // Проверка наличия всех необходимых параметров
+            if (!params.token) {
+                return { error: 242 };
             }
+            
+            // Получение пользователя по токену
+            const user = await this.checkUserByToken(params.token);
+            if (user.error) return user;
+            
+            // Проверка существования персонажа у пользователя
+            const character = await this.checkCharacterExists(user.id);
+            if (character.error) return character;
+            
+            // Проверка, что пользователь является владельцем комнаты
+            const roomMember = await this.checkUserIsRoomOwner(user.id);
+            if (roomMember.error) return roomMember;
+            
+            // Получение информации о комнате
+            const room = await this.db.getRoomById(roomMember.roomId);
+            if (!room) {
+                return { error: 2003 };
+            }
+            
+            // Проверка, что комната закрыта (все игроки зашли)
+            if (room.status !== 'closed') {
+                return { error: 2015 };
+            }
+            
+            // Получение всех участников комнаты
+            const roomMembers = await this.db.getAllRoomMembers(roomMember.roomId);
+            
+            // Проверка соответствия количества участников размеру комнаты
+            if (roomMembers.length !== room.roomSize) {
+                return { error: 2012 };
+            }
+            
+            // Проверка статуса каждого участника (все должны быть готовы)
+            let allReady = true;
+            for (const member of roomMembers) {
+                if (member.status !== 'ready') {
+                    allReady = false;
+                    break;
+                }
+            }
+            
+            if (!allReady) {
+                return { error: 2012 };
+            }
+            
+            // Начало транзакции
+            const connection = await this.db.beginTransaction();
+            try {
+                // Изменение статуса комнаты на "started" (игра началась)
+                await this.db.updateRoomStatus(roomMember.roomId, 'started');
+                
+                // Изменение статуса всех участников на "started"
+                await this.db.updateAllRoomMembersStatus(roomMember.roomId, 'started');
+                
+                // Создание начальных данных для ботов в комнате
+                await this.db.createInitialBotsForRoom(roomMember.roomId);
+                
+                // Создание начальных данных для стрел в комнате
+                await this.db.createInitialArrowsForRoom(roomMember.roomId);
+                
+                // Обновление хеша комнаты для синхронизации с клиентами
+                await this.db.updateRoomHash(this.md5(Math.random().toString()));
+                
+                // Подтверждение транзакции
+                await this.db.commit(connection);
+                return true;
+                
+            } catch (e) {
+                // Откат транзакции в случае ошибки
+                await this.db.rollback(connection);
+                return { error: 9000 };
+            }
+            
+        } catch (error) {
+            // Обработка критических ошибок
+            return { error: 9000 };
         }
-        
-        // Проверка, все ли участники готовы
-        if (readyPlayers !== room.room_size) {
-            return { error: 2012 };
-        }
-        
-        // Начало игры: обновление статуса комнаты и участников
-        await this.db.updateRoomStatus(roomMember.roomId, 'started');
-        await this.db.updateAllRoomMembersStatus(roomMember.roomId, 'started');
-        
-        // Создание начальных ботов для комнаты
-        await this.db.createInitialBotsForRoom(roomMember.roomId);
-        
-        // Создание начальных стрел для комнаты
-        await this.db.createInitialArrowsForRoom(roomMember.roomId);
-        
-        // Обновление хеша комнаты для синхронизации клиентов
-        await this.db.updateRoomHash(this.md5(Math.random().toString()));
-        
-        return true;
     }
 }
 
-module.exports = StartGame;
+module.exports = StartGameHandler;
