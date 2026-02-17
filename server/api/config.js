@@ -19,6 +19,29 @@ class CONFIG {
     static STARTED_ITEMS = [3, 5, 6, 7, 8];   // ID стартовых предметов
 
     static PASSWORD_SALT_LENGTH = 100000;  // Длина соли для пароля
+
+    //ивенты
+    static EVENTS = {
+        //user events
+        LOGIN: 'LOGIN',
+        LOGOUT: 'LOGOUT',
+        REGISTRATION: 'REGISTRATION',
+        DELETE_USER: 'DELETE_USER',
+        //items events
+        BUY_ITEM: 'BUY_ITEM',
+        SELL_ITEM: 'SELL_ITEM',
+        USE_ARROW: 'USE_ARROW',
+        USE_POTION: 'USE_POTION',
+    }
+
+    //триггеры
+    static TRIGGERS = {
+        //user triggers
+        GET_USER_INFO: 'GET_USER_INFO',
+        GET_RATING_TABLE: 'GET_RATING_TABLE',
+        //items triggers
+        GET_ITEMS_DATA: 'GET_ITEMS_DATA',
+    }
 }
 
 module.exports = CONFIG;

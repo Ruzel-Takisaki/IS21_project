@@ -1,7 +1,11 @@
 const express = require('express');
-const Answer = require('./application/router/Answer.js');
 const Router = require('./application/router/Router.js');
+const Mediator = require('./application/modules/Mediator.js');
 const CONFIG = require('./config.js');
+const Answer = require('./application/router/Answer.js');
+const UserManager = require('./application/modules/user/UserManager.js');
+const ItemsManager = require('./application/modules/items/ItemsManager.js');
+const DB = require('./application/modules/db/DB.js');
 
 const app = express();
 
@@ -14,43 +18,26 @@ app.use((req, res, next) => {
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Обработчик запросов
-app.all('/api', async (req, res) => {
-    try {
-        const params = req.method === 'GET' ? req.query : req.body;
-        
-        function result(params) {
-            const method = params.method;
-            if (method) {
-                const app = new Router();
-                switch (method) {
-                    // userHandlers
-                    case 'login': return app.login(params);
-                    case 'logout': return app.logout(params);
-                    case 'registration': return app.registration(params);
-                    case 'deleteUser': return app.deleteUser(params);
-                    case 'getUserInfo': return app.getUserInfo(params);
-                    case 'getRatingTable': return app.getRatingTable(params);
-                    // lobbyHandlers
-                    case 'createRoom': return app.createRoom(params);
-                    case 'joinToRoom': return app.joinToRoom(params);
-                    case 'leaveRoom': return app.leaveRoom(params);
-                    case 'dropFromRoom': return app.dropFromRoom(params);
-                    case 'startGame': return app.startGame(params);
-                    
-                    default: return { error: 102 };
-                }
-            }
-            return { error: 101 };
-        }
+// Экз БД
+const db = new DB();
 
-        const response = await result(params);
-        res.json(Answer.response(response));
-        
-    } catch (error) {
-        console.error('Server error:', error);
-        res.json(Answer.response({ error: 9000 }));
-    }
+// Создание медиатора
+const mediator = new Mediator({
+    EVENTS: CONFIG.EVENTS,
+    TRIGGERS: CONFIG.TRIGGERS
+});
+
+// Создаем менеджеры
+new UserManager({ mediator, db });
+new ItemsManager({ mediator, db });
+
+// Создаем роутер
+const router = new Router(mediator);
+app.use('/', router);
+
+app.use((err, req, res, next) => {
+    console.error('Cringe error:', err);
+    res.json(Answer.response({ error: 9000 }));
 });
 
 // Запуск сервака

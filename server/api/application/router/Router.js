@@ -1,148 +1,125 @@
-const BaseManager = require('./BaseManager.js');
-const DB = require('./db/DB.js');
-const Login = require('./handlers/userHandlers/login.js');
-const Logout = require('./handlers/userHandlers/logout.js');
-const Registration = require('./handlers/userHandlers/registration.js');
-const DeleteUser = require('./handlers/userHandlers/deleteUser.js');
-const GetUserInfo = require('./handlers/userHandlers/getUserInfo.js');
-const GetRatingTable = require('./handlers/userHandlers/getRatingTable.js');
-const CreateRoom = require('./handlers/lobbyHandlers/createRoom.js');
-const JoinToRoom = require('./handlers/lobbyHandlers/joinToRoom.js');
-const LeaveRoom = require('./handlers/lobbyHandlers/leaveRoom.js');
-const DropFromRoom = require('./handlers/lobbyHandlers/dropFromRoom.js');
-const StartGame = require('./handlers/lobbyHandlers/startGame.js');
+const express = require('express');
+const Answer = require('./Answer.js');
 
-class Router extends BaseManager {
-    constructor() {
-        const db = new DB();
-        super(db);
-    }
+function Router(mediator) { 
+    const router = express.Router();
 
-    // ============ USER METHODS ============
-    async login(params) {
-        if (params.login && params.passwordHash) {
-            const handler = new Login(this.db);
-            return await handler.execute(params);
-        }
-        return { error: 242 };
-    }
+    // ============ USER ROUTES ============
+    //LOGIN
+    router.post('/login{/:login}{/:passwordHash}', async (req, res) => {
+        const params = {
+            login: req.params.login,
+            passwordHash: req.params.passwordHash
+        };
+        const response = await mediator.call(mediator.getEventTypes().LOGIN, params);
+        res.json(Answer.response(response));
+    });
 
-    async logout(params) {
-        if (params.token) {
-            const user = await this.db.getUserByToken(params.token);
-            if (user) {
-                const handler = new Logout(this.db);
-                return await handler.execute(params);
-            }
-            return { error: 705 };
-        }
-        return { error: 242 };
-    }
+    //LOGOUT
+    router.post('/logout{/:token}', async (req, res) => {
+        const params = {
+            token: req.params.token
+        };
+        const response = await mediator.call(mediator.getEventTypes().LOGOUT, params);
+        res.json(Answer.response(response));
+    });
 
-    async registration(params) {
-        if (params.login && params.passwordHash && params.nickname) {
-            const handler = new Registration(this.db);
-            return await handler.execute(params);
-        }
-        return { error: 242 };
-    }
+    //REGISTATION
+    router.post('/registration{/:login}{/:passwordHash}{/:nickname}', async (req, res) => {
+        const params = {
+            login: req.params.login,
+            passwordHash: req.params.passwordHash,
+            nickname: req.params.nickname
+        };
+        const response = await mediator.call(mediator.getEventTypes().REGISTRATION, params);
+        res.json(Answer.response(response));
+    });
 
-    async getUserInfo(params) {
-        if (params.token) {
-            const user = await this.db.getUserByToken(params.token);
-            if (user) {
-                const handler = new GetUserInfo(this.db);
-                return await handler.execute(params);
-            }
-            return { error: 705 };
-        }
-        return { error: 242 };
-    }
+    //DELETE_USER
+    router.post('/deleteUser{/:token}', async (req, res) => {
+        const params = {
+            token: req.params.token
+        };
+        const response = await mediator.call(mediator.getEventTypes().DELETE_USER, params);
+        res.json(Answer.response(response));
+    });
 
-    async deleteUser(params) {
-        if (params.token) {
-            const user = await this.db.getUserByToken(params.token);
-            if (user) {
-                const handler = new DeleteUser(this.db);
-                return await handler.execute(params);
-            }
-            return { error: 705 };
-        }
-        return { error: 242 };
-    }
+    //GET_USER_INFO
+    router.get('/getUserInfo{/:token}', async (req, res) => {
+        const params = {
+            token: req.params.token
+        };
+        const response = await mediator.get(mediator.getTriggerTypes().GET_USER_INFO, params);
+        res.json(Answer.response(response));
+    });
 
-    async getRatingTable(params) {
-        if (params.token) {
-            const user = await this.db.getUserByToken(params.token);
-            if (user) {
-                const handler = new GetRatingTable(this.db);
-                return await handler.execute(params);
-            }
-            return { error: 705 };
-        }
-        return { error: 242 };
-    }
-    
-    // ============ LOBBY METHODS ============
-    async createRoom(params) {
-        if (params.token && params.roomName && params.roomSize) {
-            const user = await this.db.getUserByToken(params.token);
-            if (user) {
-                const handler = new CreateRoom(this.db);
-                return await handler.execute(params);
-            }
-            return { error: 705 };
-        }
-        return { error: 242 };
-    }
-    
-    async joinToRoom(params) {
-        if (params.token && params.roomId) {
-            const user = await this.db.getUserByToken(params.token);
-            if (user) {
-                const handler = new JoinToRoom(this.db);
-                return await handler.execute(params);
-            }
-            return { error: 705 };
-        }
-        return { error: 242 };
-    }
-    
-    async leaveRoom(params) {
-        if (params.token) {
-            const user = await this.db.getUserByToken(params.token);
-            if (user) {
-                const handler = new LeaveRoom(this.db);
-                return await handler.execute(params);
-            }
-            return { error: 705 };
-        }
-        return { error: 242 };
-    }
-    
-    async dropFromRoom(params) {
-        if (params.token && params.targetToken) {
-            const user = await this.db.getUserByToken(params.token);
-            if (user) {
-                const handler = new DropFromRoom(this.db);
-                return await handler.execute(params);
-            }
-            return { error: 705 };
-        }
-        return { error: 242 };
-    }
-    
-    async startGame(params) {
-        if (params.token) {
-            const user = await this.db.getUserByToken(params.token);
-            if (user) {
-                const handler = new StartGame(this.db);
-                return await handler.execute(params);
-            }
-            return { error: 705 };
-        }
-        return { error: 242 };
-    }
+    //GET_RATING_TABLE
+    router.get('/getRatingTable{/:token}', async (req, res) => {
+        const params = {
+            token: req.params.token
+        };
+        const response = await mediator.get(mediator.getTriggerTypes().GET_RATING_TABLE, params);
+        res.json(Answer.response(response));
+    });
+
+    // ============ ITEMS ROUTES ============
+    //BUY_ITEM
+    router.post('/buyItem{/:token}{/:itemId}', async (req, res) => {
+        const params = {
+            token: req.params.token,
+            itemId: req.params.itemId
+        };
+        const response = await mediator.call(mediator.getEventTypes().BUY_ITEM, params);
+        res.json(Answer.response(response));
+    });
+
+    //SELL_ITEM
+    router.post('/sellItem{/:token}{/:itemId}', async (req, res) => {
+        const params = {
+            token: req.params.token,
+            itemId: req.params.itemId
+        };
+        const response = await mediator.call(mediator.getEventTypes().SELL_ITEM, params);
+        res.json(Answer.response(response));
+    });
+
+    //USE_ARROW
+    router.post('/useArrow{/:token}', async (req, res) => {
+        const params = {
+            token: req.params.token
+        };
+        const response = await mediator.call(mediator.getEventTypes().USE_ARROW, params);
+        res.json(Answer.response(response));
+    });
+
+    //USE_POTION
+    router.post('/usePotion{/:token}', async (req, res) => {
+        const params = {
+            token: req.params.token
+        };
+        const response = await mediator.call(mediator.getEventTypes().USE_POTION, params);
+        res.json(Answer.response(response));
+    });
+
+    //GET_ITEMS_DATA
+    router.get('/getItemsData{/:token}', async (req, res) => {
+        const params = {
+            token: req.params.token
+        };
+        const response = await mediator.get(mediator.getTriggerTypes().GET_ITEMS_DATA, params);
+        res.json(Answer.response(response));
+    });
+
+    // ============ NOT FOUND ============
+    router.get('/*path', (req, res) => {
+        res.json(Answer.response({ error: 404 }));
+    });
+
+    router.post('/*path', (req, res) => {
+        res.json(Answer.response({ error: 404 }));
+    });
+
+    return router;
 }
 
 module.exports = Router;

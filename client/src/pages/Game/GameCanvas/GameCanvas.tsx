@@ -186,12 +186,23 @@ const GameCanvas: React.FC<TGameCanvas> = (props: TGameCanvas) => {
                 });
 
                 arrows.forEach(arrow => {
-                    printGameObject(canvas, {
-                        x: arrow.rect.x,
-                        y: arrow.rect.y,
-                        width: arrow.rect.width,
-                        height: arrow.rect.height
-                    }, "red");
+                    const startX = arrow.rect.x + arrow.rect.width / 2;
+                    const startY = arrow.rect.y + arrow.rect.height / 2;
+
+                    const arrowLength = 40;
+
+                    let endX = startX;
+                    let endY = startY;
+
+                    switch (arrow.direction) {
+                        case EDIRECTION.RIGHT:
+                            endX = startX + arrowLength;
+                            break;
+                        case EDIRECTION.LEFT:
+                            endX = startX - arrowLength;
+                            break;
+                    }
+                    canvas.arrow(startX, startY, endX, endY, '#ff0000', 3);
                 });
 
                 canvas.text(WINDOW.LEFT + 20, WINDOW.TOP + 50, String(fps), 'green');
